@@ -1,0 +1,38 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build output
+dist
+build
+.next
+out
+.turbo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ide / os
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea
+.DS_Store
+Thumbs.db
+
+# test
+coverage
+*.lcov
+
+# prisma
+apps/api/prisma/migrations/dev.db*
+
+# uploaded assets (placeholder local storage before R2)
+apps/api/uploads
