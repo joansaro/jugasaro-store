@@ -1,10 +1,17 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User, UserRole } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'node:crypto';
 
 import { PrismaService } from '@/prisma/prisma.service';
+import { MailService } from '@/mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -24,6 +31,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   toPublic(user: User): PublicUser {
@@ -69,6 +77,45 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User no longer exists');
     return this.toPublic(user);
+  }
+
+  // ---------- password reset ----------
+
+  /** Always resolves OK (no email enumeration); sends the reset link when the user exists. */
+  async forgotPassword(email: string): Promise<{ ok: true }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const token = randomBytes(32).toString('hex');
+      await this.prisma.passwordResetToken.create({
+        data: {
+          token,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        },
+      });
+      const webUrl = this.config.get<string>('WEB_URL') ?? 'http://localhost:3000';
+      this.mail.sendPasswordReset(user.email, `${webUrl}/reset-password?token=${token}`);
+    }
+    return { ok: true };
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ ok: true }> {
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { token } });
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+    const passwordHash = await argon2.hash(password);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { token },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+    return { ok: true };
   }
 
   private signToken(user: { id: string; email: string; role: UserRole }): string {

@@ -4,6 +4,7 @@ import type { Order } from '@jugasaro/shared';
 
 import { apiServer, ApiError } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
+import { CancelOrderButton } from '@/components/profile/cancel-order-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,12 +116,36 @@ export default async function OrderPage({ params }: OrderPageProps) {
             </h3>
             <dl className="space-y-1.5 text-sm">
               <Row label="Subtotal" value={formatPrice(order.subtotal)} />
-              <Row label="Shipping" value={order.shipping === 0 ? 'Free' : formatPrice(order.shipping)} />
+              {order.discount > 0 && (
+                <Row
+                  label={`Discount${order.couponCode ? ` (${order.couponCode})` : ''}`}
+                  value={`−${formatPrice(order.discount)}`}
+                />
+              )}
+              <Row
+                label={order.shippingMethodName ? `Shipping — ${order.shippingMethodName}` : 'Shipping'}
+                value={order.shipping === 0 ? 'Free' : formatPrice(order.shipping)}
+              />
               {order.tax > 0 && <Row label="Tax" value={formatPrice(order.tax)} />}
               <Row label="Total" value={formatPrice(order.total)} bold />
             </dl>
           </div>
         </div>
+
+        {order.trackingNumber && (
+          <div className="border-t border-(--color-border) pt-5">
+            <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-(--color-fg-subtle) mb-2">
+              Tracking
+            </h3>
+            <p className="font-mono text-sm">{order.trackingNumber}</p>
+          </div>
+        )}
+
+        {(order.status === 'PENDING' || order.status === 'PAID') && (
+          <div className="border-t border-(--color-border) pt-5">
+            <CancelOrderButton orderId={order.id} />
+          </div>
+        )}
       </div>
     </div>
   );

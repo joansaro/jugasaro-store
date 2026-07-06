@@ -7,6 +7,8 @@ import { Container } from '@/components/ui/container';
 import { SmartImage } from '@/components/ui/smart-image';
 import { Badge } from '@/components/ui/badge';
 import { ProductVariants } from '@/components/product/product-variants';
+import { ProductReviews } from '@/components/product/product-reviews';
+import { getMe } from '@/lib/auth-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ export async function generateMetadata({ params }: PdpProps) {
 
 export default async function ProductPage({ params }: PdpProps) {
   const { slug } = await params;
+  const me = await getMe();
   let product: Product;
   try {
     product = await apiServer.get<Product>(`/products/${slug}`);
@@ -112,6 +115,8 @@ export default async function ProductPage({ params }: PdpProps) {
             )}
           </div>
         </div>
+
+        <ProductReviews productId={product.id} isLoggedIn={me !== null} />
       </Container>
     </main>
   );

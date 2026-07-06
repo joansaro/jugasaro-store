@@ -18,6 +18,11 @@ const ShippingSchema = z.object({
   phone: z.string().max(40).optional().or(z.literal('')),
 });
 
+const OptionsSchema = z.object({
+  couponCode: z.string().max(40).optional().or(z.literal('')),
+  shippingMethodId: z.string().max(60).optional().or(z.literal('')),
+});
+
 export interface CheckoutState {
   errors?: {
     fullName?: string[];
@@ -53,6 +58,11 @@ export async function checkoutAction(_prev: CheckoutState, formData: FormData): 
     };
   }
 
+  const options = OptionsSchema.parse({
+    couponCode: raw.couponCode,
+    shippingMethodId: raw.shippingMethodId,
+  });
+
   let order: Order;
   try {
     order = await apiServer.post<Order>('/orders', {
@@ -66,6 +76,8 @@ export async function checkoutAction(_prev: CheckoutState, formData: FormData): 
         country: parsed.data.country,
         phone: parsed.data.phone || undefined,
       },
+      couponCode: options.couponCode || undefined,
+      shippingMethodId: options.shippingMethodId || undefined,
     });
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Checkout failed';

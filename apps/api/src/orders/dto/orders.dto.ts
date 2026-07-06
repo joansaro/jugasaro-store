@@ -65,6 +65,17 @@ export class CreateOrderDto {
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   shippingAddress!: ShippingAddressDto;
+
+  @ApiPropertyOptional({ example: 'WELCOME10' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  couponCode?: string;
+
+  @ApiPropertyOptional({ description: 'Chosen shipping method; falls back to the first active one' })
+  @IsOptional()
+  @IsString()
+  shippingMethodId?: string;
 }
 
 export class ListOrdersDto {
@@ -93,4 +104,10 @@ export class UpdateOrderStatusDto {
   @ApiProperty({ enum: OrderStatus })
   @IsEnum(OrderStatus)
   status!: OrderStatus;
+
+  @ApiPropertyOptional({ description: 'Carrier tracking number (set when shipping)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  trackingNumber?: string;
 }

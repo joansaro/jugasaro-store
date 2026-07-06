@@ -42,10 +42,16 @@ export class OrdersController {
     return this.orders.findOne(id, user);
   }
 
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel your own order (only before fulfillment starts)' })
+  cancelOwn(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.orders.cancelOwn(id, user);
+  }
+
   @Roles(UserRole.ADMIN)
   @Patch(':id/status')
-  @ApiOperation({ summary: '[admin] Update the status of an order' })
+  @ApiOperation({ summary: '[admin] Update the status (restocks on cancel/refund; accepts tracking)' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
-    return this.orders.updateStatus(id, dto.status);
+    return this.orders.updateStatus(id, dto.status, dto.trackingNumber);
   }
 }

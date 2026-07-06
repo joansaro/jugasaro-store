@@ -150,6 +150,13 @@ async function main() {
 
   // 1. Wipe existing data (idempotent reseeds)
   console.log('  · clearing existing data');
+  await prisma.couponRedemption.deleteMany();
+  await prisma.coupon.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.stockAdjustment.deleteMany();
+  await prisma.shippingMethod.deleteMany();
+  await prisma.setting.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.cartItem.deleteMany();
@@ -314,6 +321,107 @@ async function main() {
         },
       });
     }
+  }
+
+  // 5.b Shipping methods, settings, coupons, reviews
+  await prisma.shippingMethod.createMany({
+    data: [
+      {
+        name: 'Standard shipping',
+        description: '3-5 business days',
+        price: 999,
+        freeAbove: 7500, // free from $75
+        sortOrder: 0,
+      },
+      {
+        name: 'Express shipping',
+        description: '24-48 hours',
+        price: 1999,
+        freeAbove: null,
+        sortOrder: 1,
+      },
+      {
+        name: 'Store pickup',
+        description: 'Ready in 2 hours — Av. Demo 123',
+        price: 0,
+        freeAbove: null,
+        sortOrder: 2,
+      },
+    ],
+  });
+
+  await prisma.setting.createMany({
+    data: [
+      { key: 'store_name', value: 'Jugasaro Store' },
+      { key: 'currency', value: 'USD' },
+      // Basis points: 800 = 8.00%
+      { key: 'tax_rate_bps', value: '800' },
+      { key: 'low_stock_threshold', value: '5' },
+      { key: 'email_from', value: 'store@jugasaro.demo' },
+    ],
+  });
+
+  await prisma.coupon.createMany({
+    data: [
+      {
+        code: 'WELCOME10',
+        type: 'PERCENT',
+        value: 10,
+        maxUsesPerUser: 1,
+      },
+      {
+        code: 'SAVE15',
+        type: 'FIXED',
+        value: 1500, // $15 off
+        minSubtotal: 10000, // on $100+
+      },
+      {
+        code: 'EXPIRED5',
+        type: 'PERCENT',
+        value: 5,
+        endsAt: new Date('2024-01-01'),
+      },
+    ],
+  });
+
+  // Reviews de muestra (aprobadas) del usuario demo sobre los primeros productos
+  const demoUser = await prisma.user.findUnique({ where: { email: 'ana@jugasaro.com' } });
+  const admin = await prisma.user.findUnique({ where: { email: 'admin@jugasaro.com' } });
+  const firstProducts = await prisma.product.findMany({ take: 3, orderBy: { createdAt: 'asc' } });
+  if (demoUser && firstProducts.length >= 3) {
+    await prisma.review.createMany({
+      data: [
+        {
+          productId: firstProducts[0].id,
+          userId: demoUser.id,
+          rating: 5,
+          title: 'Excellent quality',
+          body: 'Exactly as pictured, the fabric feels premium. Shipping was fast too.',
+          status: 'APPROVED',
+          verified: true,
+        },
+        {
+          productId: firstProducts[1].id,
+          userId: demoUser.id,
+          rating: 4,
+          title: 'Good, runs slightly small',
+          body: 'Really nice piece. I would order one size up next time.',
+          status: 'APPROVED',
+          verified: true,
+        },
+        ...(admin
+          ? [{
+              productId: firstProducts[2].id,
+              userId: admin.id,
+              rating: 3,
+              title: undefined as string | undefined,
+              body: 'Pending review to moderate from the admin.',
+              status: 'PENDING' as const,
+              verified: false,
+            }]
+          : []),
+      ],
+    });
   }
 
   // 6. Summary

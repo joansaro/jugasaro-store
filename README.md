@@ -17,11 +17,17 @@
 
 ## ✨ What's inside
 
-- 🔐 **JWT auth with httpOnly cookies** — sign-up, login, roles (admin / customer).
-- 🛒 **Persistent cart & wishlist** backed by PostgreSQL, with a simulated checkout flow.
-- 🗂️ **Full admin panel**: product CRUD with variants and images, brands, categories, order status flow, KPI dashboard, role management — even the home hero carousel is editable from the panel.
-- 📦 **Reproducible seed** with 40 products and images, ready to browse out of the box.
+- 🔐 **JWT auth with httpOnly cookies** — sign-up, login, roles, and a full **password-reset flow** (token + email).
+- 🛒 **Persistent cart & wishlist**, checkout with **coupons, shipping methods and tax** (payment simulated — showcase system).
+- 🎟️ **Coupons & promotions**: percent/fixed codes with min-subtotal, usage limits (global & per-user) and validity windows; redemptions audited and revenue tracked per coupon.
+- 🚚 **Shipping methods** with free-above rules, chosen at checkout and snapshotted on the order, plus **tracking numbers** surfaced to the customer.
+- ⭐ **Reviews with moderation**: verified-purchase detection, one per user/product, approved via the admin.
+- 📦 **Inventory management**: stock decremented on checkout, **restocked on cancel/refund**, manual adjustments with an audit trail and low-stock alerts.
+- 📈 **Sales reports**: daily revenue series, top products, sales by category and CSV export.
+- 📧 **Transactional emails** (order confirmation, shipping updates, password reset) delivered to a demo **email outbox** in the admin.
+- 🗂️ **Full admin panel**: products with variants/images, brands, categories, orders with status flow + tracking, coupons, shipping, reviews, inventory, reports, store settings, users — even the home hero carousel.
 - 🧩 **Shared types package** (`packages/shared`) consumed by both API and web — one source of truth, end-to-end type safety.
+- 📦 **Reproducible seed**: 40 products, shipping methods, coupons and sample reviews out of the box.
 
 ## 🧱 Architecture
 

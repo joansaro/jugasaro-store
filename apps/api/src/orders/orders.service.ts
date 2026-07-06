@@ -8,6 +8,10 @@ import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuthUser } from '@/auth/decorators/current-user.decorator';
+import { CouponsService } from '@/coupons/coupons.service';
+import { ShippingService } from '@/shipping/shipping.service';
+import { SettingsService } from '@/settings/settings.service';
+import { MailService } from '@/mail/mail.service';
 import {
   CreateOrderDto,
   ListOrdersDto,
@@ -17,15 +21,25 @@ import {
 const ORDER_INCLUDE = {
   items: { orderBy: { productName: 'asc' as const } },
   shippingAddress: true,
+  user: { select: { email: true, name: true } },
 } satisfies Prisma.OrderInclude;
 
 type OrderWithRelations = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 
-const FREE_SHIPPING_THRESHOLD_CENTS = 7500; // $75.00 — matches the mockup banner
+// Statuses where stock was taken and the user can still self-cancel.
+const USER_CANCELLABLE: OrderStatus[] = [OrderStatus.PENDING, OrderStatus.PAID];
+// Entering one of these returns stock to inventory.
+const RESTOCK_STATUSES: OrderStatus[] = [OrderStatus.CANCELLED, OrderStatus.REFUNDED];
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly coupons: CouponsService,
+    private readonly shipping: ShippingService,
+    private readonly settings: SettingsService,
+    private readonly mail: MailService,
+  ) {}
 
   // ---------- queries ----------
 
@@ -113,9 +127,27 @@ export class OrdersService {
       const price = item.variant?.priceOverride ?? item.product.price;
       return sum + price * item.quantity;
     }, 0);
-    const shipping = subtotal >= FREE_SHIPPING_THRESHOLD_CENTS ? 0 : 999; // $9.99 default
-    const tax = 0; // TODO: tax handling
-    const total = subtotal + shipping + tax;
+
+    // Coupon (optional): validated against subtotal and usage limits
+    let couponId: string | null = null;
+    let couponCode: string | null = null;
+    let discount = 0;
+    if (dto.couponCode) {
+      const result = await this.coupons.validateForUser(dto.couponCode, userId, subtotal);
+      couponId = result.coupon.id;
+      couponCode = result.coupon.code;
+      discount = result.discount;
+    }
+
+    // Shipping method (chosen or fallback) with free-above rule
+    const method = await this.shipping.resolveForCheckout(dto.shippingMethodId);
+    const shipping = this.shipping.priceFor(method, subtotal);
+
+    // Tax over the discounted goods (not over shipping), from store settings
+    const taxRateBps = await this.settings.taxRateBps();
+    const tax = Math.round(((subtotal - discount) * taxRateBps) / 10_000);
+
+    const total = subtotal - discount + shipping + tax;
 
     const order = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
@@ -128,11 +160,16 @@ export class OrdersService {
         data: {
           number,
           userId,
-          status: OrderStatus.PAID, // simulated payment — Fase 5/7 wire up real gateway
+          status: OrderStatus.PAID, // simulated payment — this is a showcase system
           subtotal,
+          discount,
           shipping,
           tax,
           total,
+          couponId,
+          couponCode,
+          shippingMethodId: method.id,
+          shippingMethodName: method.name,
           shippingAddressId: address.id,
           items: {
             create: items.map((item) => {
@@ -152,6 +189,13 @@ export class OrdersService {
         include: ORDER_INCLUDE,
       });
 
+      // Record the coupon redemption (enforces the audit trail)
+      if (couponId) {
+        await tx.couponRedemption.create({
+          data: { couponId, userId, orderId: created.id },
+        });
+      }
+
       // Decrement variant stock
       for (const item of items) {
         if (item.variant) {
@@ -168,20 +212,81 @@ export class OrdersService {
       return created;
     });
 
+    this.mail.sendOrderConfirmation(order.user.email, {
+      number: order.number,
+      total: order.total,
+      items: order.items,
+    });
+
     return this.toResponse(order);
   }
 
-  // ---------- admin ----------
+  // ---------- lifecycle ----------
 
-  async updateStatus(orderId: string, status: OrderStatus) {
+  /** Customer self-cancel while the order hasn't started fulfillment. */
+  async cancelOwn(orderId: string, user: AuthUser) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
+    if (order.userId !== user.id) throw new ForbiddenException('Not your order');
+    if (!USER_CANCELLABLE.includes(order.status)) {
+      throw new BadRequestException(
+        'This order is already being processed and can no longer be cancelled',
+      );
+    }
+    return this.transition(orderId, OrderStatus.CANCELLED);
+  }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status },
-      include: ORDER_INCLUDE,
+  /** Admin status change; also accepts a tracking number (e.g. when shipping). */
+  async updateStatus(orderId: string, status: OrderStatus, trackingNumber?: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+    return this.transition(orderId, status, trackingNumber);
+  }
+
+  /**
+   * Applies a status change. When the order enters CANCELLED/REFUNDED the
+   * variant stock is returned exactly once (guarded by `stockRestored`).
+   */
+  private async transition(orderId: string, status: OrderStatus, trackingNumber?: string) {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      const shouldRestock = RESTOCK_STATUSES.includes(status) && !order.stockRestored;
+      if (shouldRestock) {
+        for (const item of order.items) {
+          if (item.variantId) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
+        }
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status,
+          ...(trackingNumber !== undefined ? { trackingNumber: trackingNumber || null } : {}),
+          ...(shouldRestock ? { stockRestored: true } : {}),
+        },
+        include: ORDER_INCLUDE,
+      });
     });
+
+    // Notify the customer about meaningful transitions
+    if (
+      status === OrderStatus.SHIPPED ||
+      status === OrderStatus.DELIVERED ||
+      status === OrderStatus.CANCELLED ||
+      status === OrderStatus.REFUNDED
+    ) {
+      this.mail.sendOrderStatus(updated.user.email, updated, status);
+    }
+
     return this.toResponse(updated);
   }
 
@@ -212,9 +317,14 @@ export class OrdersService {
       number: order.number,
       status: order.status,
       subtotal: order.subtotal,
+      discount: order.discount,
+      couponCode: order.couponCode,
       shipping: order.shipping,
+      shippingMethodName: order.shippingMethodName,
+      trackingNumber: order.trackingNumber,
       tax: order.tax,
       total: order.total,
+      customerEmail: order.user?.email,
       items: order.items.map((it) => ({
         id: it.id,
         productId: it.productId,

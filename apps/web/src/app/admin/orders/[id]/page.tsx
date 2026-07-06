@@ -6,6 +6,7 @@ import { apiServer, ApiError } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { PageHeader } from '@/components/admin/page-header';
 import { OrderStatusSelect } from '@/components/admin/order-status-select';
+import { TrackingForm } from '@/components/admin/tracking-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,8 +109,19 @@ export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
             </h3>
             <OrderStatusSelect orderId={order.id} current={order.status} />
             <p className="text-xs text-(--color-fg-muted)">
-              Changes are saved automatically.
+              Changes are saved automatically. Cancelling or refunding returns stock.
             </p>
+          </section>
+
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-bg-elev) p-5 space-y-3">
+            <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-(--color-fg-subtle)">
+              Tracking number
+            </h3>
+            <TrackingForm
+              orderId={order.id}
+              status={order.status}
+              current={order.trackingNumber}
+            />
           </section>
         </aside>
       </div>

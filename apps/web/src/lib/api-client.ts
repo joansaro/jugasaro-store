@@ -55,6 +55,8 @@ export const apiClient = {
     request<T>(path, { ...opts, method: 'GET' }),
   post: <T>(path: string, body?: unknown, opts: Omit<RequestOptions, 'body' | 'method'> = {}) =>
     request<T>(path, { ...opts, method: 'POST', body }),
+  put: <T>(path: string, body?: unknown, opts: Omit<RequestOptions, 'body' | 'method'> = {}) =>
+    request<T>(path, { ...opts, method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown, opts: Omit<RequestOptions, 'body' | 'method'> = {}) =>
     request<T>(path, { ...opts, method: 'PATCH', body }),
   delete: <T>(path: string, opts: Omit<RequestOptions, 'body' | 'method'> = {}) =>

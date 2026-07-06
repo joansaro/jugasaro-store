@@ -33,6 +33,11 @@ model User {
   wishlist  Wishlist?
   orders    Order[]
 
+  reviews             Review[]
+  couponRedemptions   CouponRedemption[]
+  stockAdjustments    StockAdjustment[]
+  passwordResetTokens PasswordResetToken[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -132,6 +137,7 @@ model Product {
   cartItems     CartItem[]
   wishlistItems WishlistItem[]
   orderItems    OrderItem[]
+  reviews       Review[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -165,10 +171,11 @@ model ProductVariant {
   // Optional override of the parent product price (in cents)
   priceOverride Int?    @map("price_override")
 
-  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems     CartItem[]
   wishlistItems WishlistItem[]
   orderItems    OrderItem[]
+  adjustments   StockAdjustment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -267,14 +274,30 @@ model Order {
 
   // Snapshot of money at checkout (cents)
   subtotal Int
+  discount Int @default(0)
   shipping Int @default(0)
   tax      Int @default(0)
   total    Int
 
+  // Coupon snapshot (code survives coupon deletion)
+  couponId   String? @map("coupon_id")
+  couponCode String? @map("coupon_code")
+
+  // Shipping method snapshot + fulfillment tracking
+  shippingMethodId   String? @map("shipping_method_id")
+  shippingMethodName String? @map("shipping_method_name")
+  trackingNumber     String? @map("tracking_number")
+
+  // Stock already returned after cancel/refund (prevents double restock)
+  stockRestored Boolean @default(false) @map("stock_restored")
+
   shippingAddressId String?  @map("shipping_address_id")
 
-  user            User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  shippingAddress Address?    @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  shippingAddress Address?        @relation("OrderShippingAddress", fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  coupon          Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  shippingMethod  ShippingMethod? @relation(fields: [shippingMethodId], references: [id], onDelete: SetNull)
+  redemption      CouponRedemption?
   items           OrderItem[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -319,4 +342,160 @@ model HeroSlide {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("hero_slides")
+}
+
+// =====================================================================
+// PROMOTIONS / DISCOUNTS
+// =====================================================================
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id             String     @id @default(cuid())
+  code           String     @unique
+  type           CouponType
+  // PERCENT: 1-100 · FIXED: cents
+  value          Int
+  minSubtotal    Int?       @map("min_subtotal")
+  maxUses        Int?       @map("max_uses")
+  maxUsesPerUser Int?       @map("max_uses_per_user")
+  startsAt       DateTime?  @map("starts_at")
+  endsAt         DateTime?  @map("ends_at")
+  active         Boolean    @default(true)
+
+  redemptions CouponRedemption[]
+  orders      Order[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id       String @id @default(cuid())
+  couponId String @map("coupon_id")
+  userId   String @map("user_id")
+  orderId  String @unique @map("order_id")
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([couponId])
+  @@index([userId])
+  @@map("coupon_redemptions")
+}
+
+// =====================================================================
+// SHIPPING
+// =====================================================================
+
+model ShippingMethod {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  price       Int
+  // Free when the subtotal reaches this amount (cents); null = never free
+  freeAbove   Int?    @map("free_above")
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  orders Order[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_methods")
+}
+
+// =====================================================================
+// REVIEWS
+// =====================================================================
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  productId String       @map("product_id")
+  userId    String       @map("user_id")
+  rating    Int          // 1-5
+  title     String?
+  body      String
+  status    ReviewStatus @default(PENDING)
+  // The reviewer bought this product before reviewing
+  verified  Boolean      @default(false)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // One review per user per product
+  @@unique([productId, userId])
+  @@index([status])
+  @@index([productId, status])
+  @@map("reviews")
+}
+
+// =====================================================================
+// INVENTORY
+// =====================================================================
+
+model StockAdjustment {
+  id        String  @id @default(cuid())
+  variantId String  @map("variant_id")
+  // Positive = restock · negative = correction/shrinkage
+  delta     Int
+  reason    String
+  userId    String? @map("user_id")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([variantId])
+  @@map("stock_adjustments")
+}
+
+// =====================================================================
+// STORE SETTINGS (key-value)
+// =====================================================================
+
+model Setting {
+  key   String @id
+  value String
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+// =====================================================================
+// PASSWORD RESET
+// =====================================================================
+
+model PasswordResetToken {
+  token     String    @id
+  userId    String    @map("user_id")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

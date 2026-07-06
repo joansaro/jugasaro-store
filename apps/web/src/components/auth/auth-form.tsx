@@ -130,6 +130,14 @@ export function AuthForm({ mode, action, redirectTo }: AuthFormProps) {
         autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
       />
 
+      {mode === 'login' && (
+        <p className="text-right -mt-2">
+          <Link href="/forgot-password" className="text-xs text-(--color-fg-muted) hover:text-(--color-accent)">
+            Forgot your password?
+          </Link>
+        </p>
+      )}
+
       <Button type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? (mode === 'login' ? 'Signing in…' : 'Creating account…') : mode === 'login' ? 'Sign in' : 'Create account'}
       </Button>

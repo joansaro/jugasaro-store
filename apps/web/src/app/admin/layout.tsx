@@ -1,13 +1,18 @@
 import Link from 'next/link';
 import {
+  BadgePercent,
   BarChart3,
   Images,
   Boxes,
   Layers,
+  LineChart,
+  Mail,
   Package,
   Settings,
   ShoppingCart,
+  Star,
   Tag,
+  Truck,
   Users,
 } from 'lucide-react';
 
@@ -16,12 +21,19 @@ import { AdminThemeToggle } from '@/components/admin/admin-theme-toggle';
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: BarChart3, exact: true },
+  { href: '/admin/reports', label: 'Reports', icon: LineChart },
   { href: '/admin/hero', label: 'Hero banner', icon: Images },
   { href: '/admin/products', label: 'Products', icon: Package },
+  { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { href: '/admin/brands', label: 'Brands', icon: Tag },
   { href: '/admin/categories', label: 'Categories', icon: Layers },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/coupons', label: 'Coupons', icon: BadgePercent },
+  { href: '/admin/shipping', label: 'Shipping', icon: Truck },
+  { href: '/admin/reviews', label: 'Reviews', icon: Star },
   { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/emails', label: 'Email outbox', icon: Mail },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

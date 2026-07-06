@@ -16,6 +16,13 @@ import { WishlistModule } from './wishlist/wishlist.module';
 import { OrdersModule } from './orders/orders.module';
 import { AdminModule } from './admin/admin.module';
 import { HeroModule } from './hero/hero.module';
+import { SettingsModule } from './settings/settings.module';
+import { MailModule } from './mail/mail.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { ShippingModule } from './shipping/shipping.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -35,6 +42,13 @@ import { HeroModule } from './hero/hero.module';
     OrdersModule,
     AdminModule,
     HeroModule,
+    SettingsModule,
+    MailModule,
+    CouponsModule,
+    ShippingModule,
+    ReviewsModule,
+    InventoryModule,
+    ReportsModule,
   ],
   controllers: [HealthController],
   providers: [

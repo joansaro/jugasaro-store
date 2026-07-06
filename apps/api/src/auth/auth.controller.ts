@@ -5,6 +5,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser, AuthUser } from './decorators/current-user.decorator';
 
@@ -32,6 +33,22 @@ export class AuthController {
     const { user, token } = await this.auth.login(dto);
     res.cookie(COOKIE_NAME, token, this.auth.cookieOptions());
     return { user };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset link (always returns ok)' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password using a reset token' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto.token, dto.password);
   }
 
   @Post('logout')

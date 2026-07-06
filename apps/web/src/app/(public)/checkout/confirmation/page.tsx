@@ -59,9 +59,35 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPro
               </li>
             ))}
           </ul>
-          <div className="border-t border-(--color-border) pt-3 flex justify-between text-base font-semibold">
-            <span>Total</span>
-            <span>{formatPrice(order.total)}</span>
+          <div className="border-t border-(--color-border) pt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-(--color-fg-muted)">Subtotal</span>
+              <span className="font-mono">{formatPrice(order.subtotal)}</span>
+            </div>
+            {order.discount > 0 && (
+              <div className="flex justify-between text-(--color-success)">
+                <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                <span className="font-mono">−{formatPrice(order.discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-(--color-fg-muted)">
+                Shipping{order.shippingMethodName ? ` — ${order.shippingMethodName}` : ''}
+              </span>
+              <span className="font-mono">
+                {order.shipping === 0 ? 'Free' : formatPrice(order.shipping)}
+              </span>
+            </div>
+            {order.tax > 0 && (
+              <div className="flex justify-between">
+                <span className="text-(--color-fg-muted)">Tax</span>
+                <span className="font-mono">{formatPrice(order.tax)}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-2 border-t border-(--color-border) text-base font-semibold">
+              <span>Total</span>
+              <span>{formatPrice(order.total)}</span>
+            </div>
           </div>
         </div>
 
