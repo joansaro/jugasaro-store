@@ -34,6 +34,7 @@ model User {
   orders    Order[]
 
   reviews             Review[]
+  returnRequests      ReturnRequest[]
   couponRedemptions   CouponRedemption[]
   stockAdjustments    StockAdjustment[]
   passwordResetTokens PasswordResetToken[]
@@ -78,7 +79,8 @@ model Brand {
   description String?
   logoUrl     String? @map("logo_url")
 
-  products Product[]
+  products   Product[]
+  promotions Promotion[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -98,7 +100,8 @@ model Category {
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children Category[] @relation("CategoryHierarchy")
 
-  products Product[]
+  products   Product[]
+  promotions Promotion[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -274,6 +277,8 @@ model Order {
 
   // Snapshot of money at checkout (cents)
   subtotal Int
+  // Automatic promotions (category/brand/storewide) — separate from coupon
+  promoDiscount Int @default(0) @map("promo_discount")
   discount Int @default(0)
   shipping Int @default(0)
   tax      Int @default(0)
@@ -298,6 +303,7 @@ model Order {
   coupon          Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
   shippingMethod  ShippingMethod? @relation(fields: [shippingMethodId], references: [id], onDelete: SetNull)
   redemption      CouponRedemption?
+  returnRequest   ReturnRequest?
   items           OrderItem[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -498,4 +504,57 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// =====================================================================
+// AUTOMATIC PROMOTIONS
+// =====================================================================
+
+// Percent discount applied automatically at checkout to matching items.
+// Scope: category, brand, or storewide when both are null.
+model Promotion {
+  id         String    @id @default(cuid())
+  name       String
+  value      Int       // percent 1-100
+  categoryId String?   @map("category_id")
+  brandId    String?   @map("brand_id")
+  active     Boolean   @default(true)
+  startsAt   DateTime? @map("starts_at")
+  endsAt     DateTime? @map("ends_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("promotions")
+}
+
+// =====================================================================
+// RETURNS (RMA)
+// =====================================================================
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+model ReturnRequest {
+  id        String       @id @default(cuid())
+  orderId   String       @unique @map("order_id")
+  userId    String       @map("user_id")
+  reason    String
+  status    ReturnStatus @default(REQUESTED)
+  adminNote String?      @map("admin_note")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("return_requests")
 }

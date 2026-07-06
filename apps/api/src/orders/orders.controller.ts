@@ -42,6 +42,12 @@ export class OrdersController {
     return this.orders.findOne(id, user);
   }
 
+  @Post(':id/reorder')
+  @ApiOperation({ summary: 'Buy again: put the items of this order back into the cart' })
+  reorder(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.orders.reorder(id, user);
+  }
+
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancel your own order (only before fulfillment starts)' })
   cancelOwn(@CurrentUser() user: AuthUser, @Param('id') id: string) {

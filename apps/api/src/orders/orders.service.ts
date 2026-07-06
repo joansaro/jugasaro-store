@@ -9,6 +9,7 @@ import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuthUser } from '@/auth/decorators/current-user.decorator';
 import { CouponsService } from '@/coupons/coupons.service';
+import { PromotionsService } from '@/promotions/promotions.service';
 import { ShippingService } from '@/shipping/shipping.service';
 import { SettingsService } from '@/settings/settings.service';
 import { MailService } from '@/mail/mail.service';
@@ -36,6 +37,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly coupons: CouponsService,
+    private readonly promotions: PromotionsService,
     private readonly shipping: ShippingService,
     private readonly settings: SettingsService,
     private readonly mail: MailService,
@@ -128,12 +130,26 @@ export class OrdersService {
       return sum + price * item.quantity;
     }, 0);
 
-    // Coupon (optional): validated against subtotal and usage limits
+    // Automatic promotions (category/brand/storewide) apply first
+    const promoDiscount = await this.promotions.discountForItems(
+      items.map((item) => ({
+        unitPrice: item.variant?.priceOverride ?? item.product.price,
+        quantity: item.quantity,
+        categoryId: item.product.categoryId,
+        brandId: item.product.brandId,
+      })),
+    );
+
+    // Coupon (optional): validated against the promo-effective subtotal
     let couponId: string | null = null;
     let couponCode: string | null = null;
     let discount = 0;
     if (dto.couponCode) {
-      const result = await this.coupons.validateForUser(dto.couponCode, userId, subtotal);
+      const result = await this.coupons.validateForUser(
+        dto.couponCode,
+        userId,
+        subtotal - promoDiscount,
+      );
       couponId = result.coupon.id;
       couponCode = result.coupon.code;
       discount = result.discount;
@@ -145,9 +161,9 @@ export class OrdersService {
 
     // Tax over the discounted goods (not over shipping), from store settings
     const taxRateBps = await this.settings.taxRateBps();
-    const tax = Math.round(((subtotal - discount) * taxRateBps) / 10_000);
+    const tax = Math.round(((subtotal - promoDiscount - discount) * taxRateBps) / 10_000);
 
-    const total = subtotal - discount + shipping + tax;
+    const total = subtotal - promoDiscount - discount + shipping + tax;
 
     const order = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
@@ -162,6 +178,7 @@ export class OrdersService {
           userId,
           status: OrderStatus.PAID, // simulated payment — this is a showcase system
           subtotal,
+          promoDiscount,
           discount,
           shipping,
           tax,
@@ -219,6 +236,61 @@ export class OrdersService {
     });
 
     return this.toResponse(order);
+  }
+
+  /** "Buy again": re-adds the items of a past order to the cart. */
+  async reorder(orderId: string, user: AuthUser) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true, variant: true } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.userId !== user.id) throw new ForbiddenException('Not your order');
+
+    const cart = await this.prisma.cart.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id },
+      update: {},
+    });
+
+    let added = 0;
+    let skipped = 0;
+    for (const item of order.items) {
+      const available =
+        item.product &&
+        item.product.published &&
+        !item.product.outOfStock &&
+        (!item.variant || item.variant.stock >= item.quantity);
+      if (!available) {
+        skipped++;
+        continue;
+      }
+      // Nota: el unique compuesto no admite null en \`where\`, así que se resuelve a mano.
+      const existing = await this.prisma.cartItem.findFirst({
+        where: {
+          cartId: cart.id,
+          productId: item.product!.id,
+          variantId: item.variant?.id ?? null,
+        },
+      });
+      if (existing) {
+        await this.prisma.cartItem.update({
+          where: { id: existing.id },
+          data: { quantity: { increment: item.quantity } },
+        });
+      } else {
+        await this.prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            productId: item.product!.id,
+            variantId: item.variant?.id ?? null,
+            quantity: item.quantity,
+          },
+        });
+      }
+      added++;
+    }
+    return { added, skipped };
   }
 
   // ---------- lifecycle ----------
@@ -317,6 +389,7 @@ export class OrdersService {
       number: order.number,
       status: order.status,
       subtotal: order.subtotal,
+      promoDiscount: order.promoDiscount,
       discount: order.discount,
       couponCode: order.couponCode,
       shipping: order.shipping,

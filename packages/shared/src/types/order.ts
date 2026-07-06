@@ -34,6 +34,7 @@ export interface Order {
   number: string;
   status: OrderStatus;
   subtotal: number;
+  promoDiscount: number;
   discount: number;
   couponCode: string | null;
   shipping: number;
@@ -83,4 +84,29 @@ export interface CouponValidation {
   value: number;
   discount: number;
   subtotal: number;
+}
+
+export interface Promotion {
+  id: string;
+  name: string;
+  value: number;
+  categoryId: string | null;
+  brandId: string | null;
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  category?: { name: string } | null;
+  brand?: { name: string } | null;
+  createdAt: string;
+}
+
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  reason: string;
+  status: ReturnStatus;
+  adminNote: string | null;
+  createdAt: string;
 }

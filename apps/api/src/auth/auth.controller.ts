@@ -36,6 +36,16 @@ export class AuthController {
   }
 
   @Public()
+  @Post('guest')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Guest checkout: express account with just an email' })
+  async guest(@Body() dto: ForgotPasswordDto, @Res({ passthrough: true }) res: Response) {
+    const { user, token } = await this.auth.guest(dto.email);
+    res.cookie(COOKIE_NAME, token, this.auth.cookieOptions());
+    return { user };
+  }
+
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset link (always returns ok)' })

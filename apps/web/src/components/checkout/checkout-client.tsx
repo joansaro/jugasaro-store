@@ -56,10 +56,11 @@ interface Props {
   cart: Cart;
   methods: ShippingMethod[];
   taxRateBps: number;
+  promoDiscount: number;
   defaultName?: string;
 }
 
-export function CheckoutClient({ cart, methods, taxRateBps, defaultName }: Props) {
+export function CheckoutClient({ cart, methods, taxRateBps, promoDiscount, defaultName }: Props) {
   const [state, formAction, pending] = useActionState<CheckoutState, FormData>(checkoutAction, {});
 
   const [methodId, setMethodId] = useState(methods[0]?.id ?? '');
@@ -70,6 +71,7 @@ export function CheckoutClient({ cart, methods, taxRateBps, defaultName }: Props
 
   const subtotal = cart.subtotal;
   const discount = coupon?.discount ?? 0;
+  const effectiveSubtotal = subtotal - promoDiscount;
 
   const shipping = useMemo(() => {
     const method = methods.find((m) => m.id === methodId);
@@ -78,8 +80,8 @@ export function CheckoutClient({ cart, methods, taxRateBps, defaultName }: Props
     return method.price;
   }, [methods, methodId, subtotal]);
 
-  const tax = Math.round(((subtotal - discount) * taxRateBps) / 10_000);
-  const total = subtotal - discount + shipping + tax;
+  const tax = Math.round(((effectiveSubtotal - discount) * taxRateBps) / 10_000);
+  const total = effectiveSubtotal - discount + shipping + tax;
 
   async function applyCoupon() {
     if (!couponInput.trim()) return;
@@ -243,6 +245,12 @@ export function CheckoutClient({ cart, methods, taxRateBps, defaultName }: Props
               <span className="text-(--color-fg-muted)">Subtotal</span>
               <span className="font-mono">{formatPrice(subtotal)}</span>
             </div>
+            {promoDiscount > 0 && (
+              <div className="flex justify-between text-(--color-success)">
+                <span>Promotions</span>
+                <span className="font-mono">−{formatPrice(promoDiscount)}</span>
+              </div>
+            )}
             {discount > 0 && (
               <div className="flex justify-between text-(--color-success)">
                 <span>Discount ({coupon?.code})</span>

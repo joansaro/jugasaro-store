@@ -10,10 +10,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function CheckoutPage() {
   const user = await requireAuth();
-  const [cart, methods, settings] = await Promise.all([
+  const [cart, methods, settings, promo] = await Promise.all([
     apiServer.get<Cart>('/cart'),
     apiServer.get<ShippingMethod[]>('/shipping-methods'),
     apiServer.get<StoreSettings>('/settings'),
+    apiServer.get<{ discount: number }>('/promotions/cart-discount'),
   ]);
 
   if (cart.items.length === 0) {
@@ -39,6 +40,7 @@ export default async function CheckoutPage() {
           cart={cart}
           methods={methods}
           taxRateBps={settings.taxRateBps}
+          promoDiscount={promo.discount}
           defaultName={user.name ?? undefined}
         />
       </Container>

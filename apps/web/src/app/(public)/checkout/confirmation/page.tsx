@@ -64,6 +64,12 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPro
               <span className="text-(--color-fg-muted)">Subtotal</span>
               <span className="font-mono">{formatPrice(order.subtotal)}</span>
             </div>
+            {order.promoDiscount > 0 && (
+              <div className="flex justify-between text-(--color-success)">
+                <span>Promotions</span>
+                <span className="font-mono">−{formatPrice(order.promoDiscount)}</span>
+              </div>
+            )}
             {order.discount > 0 && (
               <div className="flex justify-between text-(--color-success)">
                 <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>

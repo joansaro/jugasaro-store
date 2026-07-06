@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation';
 
 import { Container } from '@/components/ui/container';
 import { AuthForm } from '@/components/auth/auth-form';
+import { GuestCheckout } from '@/components/auth/guest-checkout';
 import { getMe } from '@/lib/auth-server';
 import { loginAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 interface LoginPageProps {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; error?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -31,6 +32,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </h1>
         </div>
         <AuthForm mode="login" action={loginAction} redirectTo={sp.redirect} />
+        <GuestCheckout error={sp.error} />
       </Container>
     </main>
   );

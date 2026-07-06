@@ -19,9 +19,12 @@
 
 - 🔐 **JWT auth with httpOnly cookies** — sign-up, login, roles, and a full **password-reset flow** (token + email).
 - 🛒 **Persistent cart & wishlist**, checkout with **coupons, shipping methods and tax** (payment simulated — showcase system).
-- 🎟️ **Coupons & promotions**: percent/fixed codes with min-subtotal, usage limits (global & per-user) and validity windows; redemptions audited and revenue tracked per coupon.
+- 🎟️ **Coupons**: percent/fixed codes with min-subtotal, usage limits (global & per-user) and validity windows; redemptions audited and revenue tracked per coupon.
+- ✨ **Automatic promotions**: percent discounts by category, brand or storewide — applied at checkout with no code, stackable with coupons.
 - 🚚 **Shipping methods** with free-above rules, chosen at checkout and snapshotted on the order, plus **tracking numbers** surfaced to the customer.
 - ⭐ **Reviews with moderation**: verified-purchase detection, one per user/product, approved via the admin.
+- 🔄 **Returns (RMA)**: customers request a return on delivered orders; approving refunds the order, restores stock and emails the customer.
+- 👤 **Guest checkout**: express account with just an email (set-password link sent by email) — plus **buy again** and a **printable invoice** per order.
 - 📦 **Inventory management**: stock decremented on checkout, **restocked on cancel/refund**, manual adjustments with an audit trail and low-stock alerts.
 - 📈 **Sales reports**: daily revenue series, top products, sales by category and CSV export.
 - 📧 **Transactional emails** (order confirmation, shipping updates, password reset) delivered to a demo **email outbox** in the admin.

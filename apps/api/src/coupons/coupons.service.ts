@@ -7,11 +7,15 @@ import {
 import { Coupon, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
+import { PromotionsService } from '@/promotions/promotions.service';
 import { CreateCouponDto, UpdateCouponDto } from './dto/coupons.dto';
 
 @Injectable()
 export class CouponsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotions: PromotionsService,
+  ) {}
 
   // ---------- validation / application ----------
 
@@ -64,17 +68,18 @@ export class CouponsService {
     return Math.min(raw, subtotal);
   }
 
-  /** Validate against the user's current cart (public endpoint). */
+  /** Validate against the user's current cart, net of automatic promotions. */
   async validateAgainstCart(code: string, userId: string) {
-    const subtotal = await this.cartSubtotal(userId);
+    const { subtotal, discount: promoDiscount } = await this.promotions.discountForCart(userId);
     if (subtotal === 0) throw new BadRequestException('Cart is empty');
-    const { coupon, discount } = await this.validateForUser(code, userId, subtotal);
+    const effective = subtotal - promoDiscount;
+    const { coupon, discount } = await this.validateForUser(code, userId, effective);
     return {
       code: coupon.code,
       type: coupon.type,
       value: coupon.value,
       discount,
-      subtotal,
+      subtotal: effective,
     };
   }
 

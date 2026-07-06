@@ -150,6 +150,8 @@ async function main() {
 
   // 1. Wipe existing data (idempotent reseeds)
   console.log('  · clearing existing data');
+  await prisma.returnRequest.deleteMany();
+  await prisma.promotion.deleteMany();
   await prisma.couponRedemption.deleteMany();
   await prisma.coupon.deleteMany();
   await prisma.review.deleteMany();
@@ -360,6 +362,18 @@ async function main() {
       { key: 'email_from', value: 'store@jugasaro.demo' },
     ],
   });
+
+  // Promoción automática de ejemplo: -15% en la primera categoría
+  const promoCategory = await prisma.category.findFirst({ orderBy: { createdAt: 'asc' } });
+  if (promoCategory) {
+    await prisma.promotion.create({
+      data: {
+        name: `${promoCategory.name} sale`,
+        value: 15,
+        categoryId: promoCategory.id,
+      },
+    });
+  }
 
   await prisma.coupon.createMany({
     data: [

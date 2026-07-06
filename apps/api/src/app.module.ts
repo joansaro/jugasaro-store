@@ -23,6 +23,8 @@ import { ShippingModule } from './shipping/shipping.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { ReportsModule } from './reports/reports.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { ReturnsModule } from './returns/returns.module';
 
 @Module({
   imports: [
@@ -49,6 +51,8 @@ import { ReportsModule } from './reports/reports.module';
     ReviewsModule,
     InventoryModule,
     ReportsModule,
+    PromotionsModule,
+    ReturnsModule,
   ],
   controllers: [HealthController],
   providers: [

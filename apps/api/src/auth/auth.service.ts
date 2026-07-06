@@ -79,6 +79,43 @@ export class AuthService {
     return this.toPublic(user);
   }
 
+  /**
+   * Guest express account: creates a shadow account with just an email,
+   * logs the user in, and emails a set-password link (reset token).
+   */
+  async guest(email: string): Promise<{ user: PublicUser; token: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('This email already has an account — sign in instead');
+    }
+    const passwordHash = await argon2.hash(randomBytes(24).toString('hex'));
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name: null,
+        role: UserRole.USER,
+        cart: { create: {} },
+        wishlist: { create: {} },
+      },
+    });
+
+    // Enlace para fijar contraseña más tarde (mismo flujo del reset)
+    const resetToken = randomBytes(32).toString('hex');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        token: resetToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
+      },
+    });
+    const webUrl = this.config.get<string>('WEB_URL') ?? 'http://localhost:3000';
+    this.mail.sendPasswordReset(user.email, `${webUrl}/reset-password?token=${resetToken}`);
+
+    const token = this.signToken(user);
+    return { user: this.toPublic(user), token };
+  }
+
   // ---------- password reset ----------
 
   /** Always resolves OK (no email enumeration); sends the reset link when the user exists. */

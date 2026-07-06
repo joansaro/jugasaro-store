@@ -74,3 +74,21 @@ export async function loginAsDemoAction(
 
   redirect(failed ? '/login?error=demo' : role === 'admin' ? '/admin' : '/');
 }
+
+
+/** Checkout de invitado: cuenta exprés con solo el email (patrón void como el demo login). */
+export async function guestAction(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') ?? '').trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    redirect('/login?error=guest-email');
+  }
+
+  let error: string | null = null;
+  try {
+    await authPostAndForwardCookie('/auth/guest', { email });
+  } catch (err) {
+    error = err instanceof AuthError ? 'guest-exists' : 'guest';
+  }
+
+  redirect(error ? `/login?error=${error}` : '/');
+}

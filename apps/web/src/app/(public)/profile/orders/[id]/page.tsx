@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import type { Order } from '@jugasaro/shared';
+import type { Order, ReturnRequest } from '@jugasaro/shared';
 
 import { apiServer, ApiError } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { CancelOrderButton } from '@/components/profile/cancel-order-button';
+import { OrderActions } from '@/components/profile/order-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,11 @@ export default async function OrderPage({ params }: OrderPageProps) {
   const { id } = await params;
 
   let order: Order;
+  let returnRequest: ReturnRequest | null = null;
   try {
     order = await apiServer.get<Order>(`/orders/${id}`);
+    const wrapped = await apiServer.get<{ request: ReturnRequest | null }>(`/returns/order/${id}`);
+    returnRequest = wrapped.request;
   } catch (err) {
     if (err instanceof ApiError && (err.status === 404 || err.status === 403)) notFound();
     throw err;
@@ -116,6 +120,9 @@ export default async function OrderPage({ params }: OrderPageProps) {
             </h3>
             <dl className="space-y-1.5 text-sm">
               <Row label="Subtotal" value={formatPrice(order.subtotal)} />
+              {order.promoDiscount > 0 && (
+                <Row label="Promotions" value={`−${formatPrice(order.promoDiscount)}`} />
+              )}
               {order.discount > 0 && (
                 <Row
                   label={`Discount${order.couponCode ? ` (${order.couponCode})` : ''}`}
@@ -146,6 +153,10 @@ export default async function OrderPage({ params }: OrderPageProps) {
             <CancelOrderButton orderId={order.id} />
           </div>
         )}
+
+        <div className="border-t border-(--color-border) pt-5">
+          <OrderActions order={order} returnRequest={returnRequest} />
+        </div>
       </div>
     </div>
   );

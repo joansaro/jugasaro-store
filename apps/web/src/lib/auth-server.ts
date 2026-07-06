@@ -36,7 +36,7 @@ export class AuthError extends Error {
  * onto the user's response so subsequent requests are authenticated.
  */
 export async function authPostAndForwardCookie(
-  path: '/auth/login' | '/auth/register',
+  path: '/auth/login' | '/auth/register' | '/auth/guest',
   body: unknown,
 ): Promise<User> {
   const baseInternal = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
